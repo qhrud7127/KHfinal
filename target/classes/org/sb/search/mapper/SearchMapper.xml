@@ -1,0 +1,165 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+	PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+	"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	
+	<mapper namespace="org.sb.search.mapper.SearchMapper">
+	<!-- search sql -->
+	<sql id="search">
+		<trim prefix="(" suffix=") AND " prefixOverrides="OR">
+			<foreach item="type" collection="typeArr">
+				<trim prefix="OR">
+					<choose>
+						<when test="type == 'T'.toString()">
+							title like '%'||#{keyword}||'%'
+						</when>
+						<when test="type == 'A'.toString()">
+							author like '%'||#{keyword}||'%'
+						</when>
+						<when test="type == 'P'.toString()">
+							publisher like '%'||#{keyword}||'%'
+						</when>
+					</choose>
+				</trim>
+			</foreach>
+		</trim>
+	</sql>
+	<!-- search sql -->
+	
+	
+		<insert id="insert">
+			insert into book(bno,title,link,image,author,price,discount,publisher,pubdate,isbn,description,nowcount)
+			values (seq_book.nextval,#{title}, #{link},#{image},#{author},#{price},#{discount},#{publisher},#{pubdate},#{isbn},#{description},1)
+		</insert>
+		
+		<select id="getBookByBno" resultType="org.sb.manage.domain.Book">
+			select * from book where bno = #{bno}
+		</select>
+		
+		<select id="getList" resultType="org.sb.manage.domain.Book">
+			<![CDATA[
+				select bno,title,link,image,author,price,discount,publisher,pubdate,isbn,description,nowcount
+				from (select rownum rn, bno, title, link,image,author,price,discount,publisher,pubdate,isbn,description,nowcount
+					from book where
+			]]>
+			<include refid="search"></include>
+			<![CDATA[
+					rownum <= #{pageNum} * #{amount} 
+					)
+					where rn > (#{pageNum} -1 ) * #{amount}
+			]]>
+		</select>
+		
+		<!-- 모든 도서 개수 -->
+		<select id="getTotalCount" resultType="int">
+			select count(*) from book 
+			where
+			<include refid="search"></include>
+			bno > 0
+		</select>
+		
+		<delete id="deleteById">
+			delete from book where bno = #{bno}
+		</delete>
+		
+		<insert id="addCart">
+			insert into book_cart(cartNum, member_no, bno)
+			values(seq_book_cart.nextval, #{member_no}, #{bno})
+		</insert>
+		
+		<select id="cartList" resultType="org.sb.search.domain.BookCartList">
+			select row_number() over(order by c.cartNum desc) as num,
+				c.cartNum, c.member_no, c.bno, c.addDate,
+				b.title, b.isbn, b.author, b.publisher
+			from book_cart c inner join book b on c.bno = b.bno
+				where c.member_no = #{member_no}
+		</select>
+		
+		<!-- 카트 삭제 -->
+		<delete id="deleteCart">
+			delete book_cart
+				where cartNum = #{cartNum}
+					and member_no = #{member_no}
+		</delete>
+		
+		<!-- 대여하기 -->
+		<insert id="rentBook">
+			insert into rentInfo(rentId, member_no, bno)
+			values(seq_rentid.nextval, #{member_no}, #{bno})
+		</insert>
+		
+		<!-- 대여 후 카트 삭제 -->
+		<delete id="cartAllDelete">
+			delete book_cart 
+				where member_no = #{member_no}
+		</delete>
+		
+		<!-- 반납된 도서 목록 보기 -->
+		<select id="returnList" resultType="org.sb.search.domain.Rent">
+			select r.rentid, r.bno, r.member_no, r.rentDate, b.title, re.returnDate, b.author
+			from rentinfo r
+				inner join book b on r.bno = b.bno
+				inner join returninfo re on re.rentid = r.rentid 
+			where member_no = #{member_no} 
+			order by r.rentid desc
+		</select>
+		
+		<!-- 대여 목록 보기 -->
+		<select id="rentList" resultType="org.sb.search.domain.Rent">
+			select r.rentid ,r.bno, r.member_no, r.rentDate, b.title, b.author, r.rentDate+14 as returnexpDate
+			from rentinfo r
+				inner join book b on r.bno = b.bno
+			where member_no = #{member_no} and r.returnDate is null
+			order by r.rentid desc
+		</select>
+		
+		<!-- 대여시 상태 변경 : 대여-->
+		<update id="rentByBno">
+			update book set nowcount = 0 where bno = #{bno}
+		</update>
+		<!-- 대여시 상태 변경 : 반납-->
+		<update id="returnByBno">
+			update book set nowcount = 1 where bno = #{bno}
+		</update>
+		
+		<update id="returnBook">
+			update rentInfo set returnDate = sysdate
+			where rentId = #{rentId}
+		</update>
+		
+<!-- 		<insert id="returnBook"> -->
+<!-- 			insert into returnInfo(rentId,returnDate) -->
+<!-- 			values(#{rentId},sysdate) -->
+<!-- 		</insert> -->
+
+		<select id="getReturnDate" resultType="org.sb.search.domain.Rent">
+		<![CDATA[
+			select r.rentid,r.bno,r.member_no,r.rentdate, r.returndate,b.title,
+ 				case 
+    				when r.returndate is null then '대여중'
+    				when r.returndate < sysdate then '반납완료'
+    				end as status
+			from rentInfo r
+				inner join book b on b.bno = r.bno
+				where r.member_no = #{member_no}
+			order by rentid desc
+		]]>
+		</select>
+		
+		<!-- 대여중인 책 수 -->
+		<select id="getRentCount" resultType="int">
+			select count(*)
+			from rentInfo
+            where member_no = #{member_no} and returndate is null
+		</select>
+		
+		<select id="findBookByBno" resultType="String">
+			select * from book where bno=#{bno}
+		</select>
+		
+		<delete id="cartDeleteByRent">
+			delete from book_cart where member_no=#{member_no} and bno = #{bno}
+		</delete>
+
+		
+	</mapper>
