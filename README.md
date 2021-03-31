@@ -58,3 +58,6 @@
 >>![samboLib](https://user-images.githubusercontent.com/77611380/113113788-9e3b0980-9245-11eb-8ed1-d3019c4efb89.png)
 >>
 > ## 결과
+>
+>>![samboLibMain](https://user-images.githubusercontent.com/77611380/113113975-d9d5d380-9245-11eb-8cdc-c7c7457fcef4.png)
+
